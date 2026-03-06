@@ -1,42 +1,62 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Hello World Firebase</title>
-    
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-      // Adicionamos 'logEvent' aqui:
-      import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
 
-      const firebaseConfig = {
-        apiKey: "AIzaSyAI4puz26cccTqcTQAn-0Uaoy64b0usofE",
-        authDomain: "llm-studies.firebaseapp.com",
-        projectId: "llm-studies",
-        storageBucket: "llm-studies.firebasestorage.app",
-        messagingSenderId: "129125337363",
-        appId: "1:129125337363:web:d63026258767dba7d272e6",
-        measurementId: "G-1QTZXGY59L"
-      };
+<head>
+  <meta charset="utf-8">
+  <title>Firestore Hello World</title>
 
-      const app = initializeApp(firebaseConfig);
-      const analytics = getAnalytics(app);
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+    // Adicionamos as funções do Firestore aqui:
+    import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
-      // Função para disparar o evento
-      window.dispararEvento = () => {
-        logEvent(analytics, 'botao_clicado', {
-          item_nome: 'Botão de Teste',
-          horario: new Date().toISOString()
+    const firebaseConfig = {
+      apiKey: "AIzaSyAI4puz26cccTqcTQAn-0Uaoy64b0usofE",
+      authDomain: "llm-studies.firebaseapp.com",
+      projectId: "llm-studies",
+      storageBucket: "llm-studies.firebasestorage.app",
+      messagingSenderId: "129125337363",
+      appId: "1:129125337363:web:d63026258767dba7d272e6"
+    };
+
+    // Inicializar Firebase e Firestore
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = getFirestore(app);
+
+    // Função para salvar no banco
+    window.salvarNoFirestore = async () => {
+      try {
+        const docRef = await addDoc(collection(db, "mensagens"), {
+          texto: "Hello do Firestore!",
+          autor: "Usuario Anonimo",
+          data: serverTimestamp()
         });
-        alert("Evento enviado ao Firebase!");
-        console.log("Evento 'botao_clicado' enviado!");
-      };
-    </script>
-  </head>
-  <body>
-    <h1>Hello World!</h1>
-    <p>Firebase Analytics Personalizado.</p>
-    
-    <button onclick="dispararEvento()">Clique aqui para disparar evento</button>
-  </body>
+
+        alert("Documento salvo com ID: " + docRef.id);
+        console.log("Documento escrito com ID: ", docRef.id);
+      } catch (e) {
+        console.error("Erro ao adicionar documento: ", e);
+        alert("Erro ao salvar! Verifique o console.");
+      }
+    };
+
+    // Função para disparar o evento
+    window.dispararEvento = () => {
+      logEvent(analytics, 'botao_clicado', {
+        item_nome: 'Botão de Teste',
+        horario: new Date().toISOString()
+      });
+      alert("Evento enviado ao Firebase!");
+      console.log("Evento 'botao_clicado' enviado!");
+    };</script>
+</head>
+
+<body>
+  <h1>Firestore Integration</h1>
+  <button onclick="salvarNoFirestore()">Salvar "Hello" no Banco</button>
+  <button onclick="dispararEvento()">Clique aqui para disparar evento</button>
+</body>
+
 </html>
