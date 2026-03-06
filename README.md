@@ -23,6 +23,28 @@ Step 2: Add the Analytics SDK to Your App
 
 
 
+3. Create venv
+```bash
+py -m venv .venv
+.venv\scripts\activate
+.venv\scripts\python -m pip install --upgrade pip
+.venv\scripts\activate && .venv\Scripts\pip install -r requirements.txt
+```
+
+.venv\scripts\activate && .venv\Scripts\python data_agent\create_end.py
+
+pip install requests
+
+gcloud auth login
+
+# Load var
+```bash
+get-content .env | foreach {
+    $name, $value = $_.split('=')
+    set-content env:\$name $value
+    echo $name $value
+}
+```
 # Acesso
 
 - [Console Firebase](https://console.firebase.google.com/project/llm-studies/overview)
