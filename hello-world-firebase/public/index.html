@@ -3,33 +3,40 @@
   <head>
     <meta charset="utf-8">
     <title>Hello World Firebase</title>
-    <!-- Importar o Firebase SDK (versões modulares) -->
-<script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+    
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+      // Adicionamos 'logEvent' aqui:
+      import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
 
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyAI4puz26cccTqcTQAn-0Uaoy64b0usofE",
-    authDomain: "llm-studies.firebaseapp.com",
-    projectId: "llm-studies",
-    storageBucket: "llm-studies.firebasestorage.app",
-    messagingSenderId: "129125337363",
-    appId: "1:129125337363:web:d63026258767dba7d272e6",
-    measurementId: "G-1QTZXGY59L"
-  };
+      const firebaseConfig = {
+        apiKey: "AIzaSyAI4puz26cccTqcTQAn-0Uaoy64b0usofE",
+        authDomain: "llm-studies.firebaseapp.com",
+        projectId: "llm-studies",
+        storageBucket: "llm-studies.firebasestorage.app",
+        messagingSenderId: "129125337363",
+        appId: "1:129125337363:web:d63026258767dba7d272e6",
+        measurementId: "G-1QTZXGY59L"
+      };
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
-</head>
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+
+      // Função para disparar o evento
+      window.dispararEvento = () => {
+        logEvent(analytics, 'botao_clicado', {
+          item_nome: 'Botão de Teste',
+          horario: new Date().toISOString()
+        });
+        alert("Evento enviado ao Firebase!");
+        console.log("Evento 'botao_clicado' enviado!");
+      };
+    </script>
+  </head>
   <body>
     <h1>Hello World!</h1>
-    <p>Firebase está configurado e rodando.</p>
+    <p>Firebase Analytics Personalizado.</p>
+    
+    <button onclick="dispararEvento()">Clique aqui para disparar evento</button>
   </body>
 </html>
