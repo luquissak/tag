@@ -36,6 +36,7 @@ py -m venv .venv
 pip install requests
 
 gcloud auth login
+gcloud auth application-default login
 
 # Load var
 ```bash

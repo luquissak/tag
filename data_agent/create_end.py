@@ -1,26 +1,41 @@
 import os
-
 import requests
-import subprocess
 import json
+import google.auth
+import google.auth.transport.requests
 from dotenv import load_dotenv
 
+# Carrega as variáveis do arquivo .env
+load_dotenv()
+
 def get_google_auth_token():
-    """Obtém o token de acesso via gcloud CLI."""
+    """Obtém o token de acesso de forma nativa (sem gcloud CLI)."""
     try:
-        token = subprocess.check_output(
-            ["gcloud", "auth", "print-access-token"], 
-            encoding="utf-8"
-        ).strip()
-        return token
+        # Busca credenciais padrão do ambiente (ADC)
+        credentials, project = google.auth.default(
+            scopes=['https://www.googleapis.com/auth/cloud-platform']
+        )
+        auth_request = google.auth.transport.requests.Request()
+        credentials.refresh(auth_request)
+        return credentials.token
     except Exception as e:
-        print(f"Erro ao obter token: {e}")
+        print(f"❌ Erro de Autenticação: {e}")
+        print("Dica: Execute 'gcloud auth application-default login' no terminal.")
         return None
 
-def create_data_agent(project_id, location, agent_id, bq_table_uri):
-    token = get_google_auth_token()
-    if not token:
+def create_data_agent():
+    # Recuperando variáveis de ambiente
+    project_id = os.getenv("GCP_PROJECT_ID")
+    location = os.getenv("GCP_LOCATION")
+    agent_id = os.getenv("DATA_AGENT_ID")
+    bq_table_uri = os.getenv("BQ_TABLE_URI")
+
+    if not all([project_id, location, agent_id, bq_table_uri]):
+        print("❌ Erro: Verifique as variáveis no seu arquivo .env")
         return
+
+    token = get_google_auth_token()
+    if not token: return
 
     url = f"https://conversationalanalytics.googleapis.com/v1alpha1/projects/{project_id}/locations/{location}/dataAgents:createSync"
     
@@ -29,45 +44,23 @@ def create_data_agent(project_id, location, agent_id, bq_table_uri):
         "Content-Type": "application/json; charset=utf-8"
     }
 
-    # Estrutura do Data Agent
     payload = {
         "dataAgentId": agent_id,
         "dataAgent": {
-            "displayName": "Agente de Analytics Inteligente",
-            "description": "Agente para consultas em linguagem natural sobre BigQuery",
-            "dataSources": [
-                {
-                    "bigquerySource": {
-                        "tableUri": bq_table_uri
-                    }
-                }
-            ],
-            "instruction": {
-                "systemInstruction": "Você é um assistente de dados. Responda perguntas baseadas apenas nos dados fornecidos."
-            }
+            "displayName": f"Agente {agent_id}",
+            "dataSources": [{"bigquerySource": {"tableUri": bq_table_uri}}],
+            "instruction": {"systemInstruction": "Você é um analista de dados."}
         }
     }
 
-    print(f"Criando agente '{agent_id}'...")
+    print(f"🚀 Enviando requisição para {location}...")
     response = requests.post(url, headers=headers, json=payload)
 
     if response.status_code == 200:
-        print("✅ Sucesso! Agente criado com os seguintes detalhes:")
+        print("✅ Agente criado com sucesso!")
         print(json.dumps(response.json(), indent=2))
     else:
-        print(f"❌ Erro {response.status_code}:")
-        print(response.text)
+        print(f"❌ Erro {response.status_code}: {response.text}")
 
 if __name__ == "__main__":
-    print
-    project_id = os.getenv("GCP_PROJECT_ID")
-    location = os.getenv("GCP_LOCATION")
-    agent_id = os.getenv("DATA_AGENT_ID")
-    bq_table_uri = os.getenv("BQ_TABLE_URI")
-    PROJECT_ID = project_id
-    LOCATION = location
-    AGENT_ID = agent_id
-    # Formato: bq://projeto.dataset.tabela
-    TABLE_URI = bq_table_uri
-
-    create_data_agent(PROJECT_ID, LOCATION, AGENT_ID, TABLE_URI)
+    create_data_agent()
