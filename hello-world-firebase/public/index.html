@@ -10,6 +10,8 @@
     // Adicionamos as funções do Firestore aqui:
     import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+
 
     const firebaseConfig = {
       apiKey: "AIzaSyAI4puz26cccTqcTQAn-0Uaoy64b0usofE",
@@ -24,6 +26,41 @@
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
     const db = getFirestore(app);
+
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    // Função de Login
+    window.fazerLogin = () => {
+      signInWithPopup(auth, provider)
+        .then((result) => {
+          console.log("Usuário logado:", result.user.displayName);
+        }).catch((error) => {
+          console.error("Erro no login:", error);
+        });
+    };
+
+    // Função de Logout
+    window.fazerLogout = () => {
+      signOut(auth);
+    };
+
+    // Observador de estado (monitora se o usuário está logado ou não)
+    onAuthStateChanged(auth, (user) => {
+      const status = document.getElementById('status');
+      const btnLogin = document.getElementById('btnLogin');
+      const btnLogout = document.getElementById('btnLogout');
+
+      if (user) {
+        status.innerHTML = `Olá, <b>${user.displayName}</b>!`;
+        btnLogin.style.display = 'none';
+        btnLogout.style.display = 'block';
+      } else {
+        status.innerHTML = "Você não está logado.";
+        btnLogin.style.display = 'block';
+        btnLogout.style.display = 'none';
+      }
+    });
 
     // Função para salvar no banco
     window.salvarNoFirestore = async () => {
@@ -57,6 +94,8 @@
   <h1>Firestore Integration</h1>
   <button onclick="salvarNoFirestore()">Salvar "Hello" no Banco</button>
   <button onclick="dispararEvento()">Clique aqui para disparar evento</button>
+  <button id="btnLogin" onclick="fazerLogin()">Entrar com Google</button>
+  <button id="btnLogout" onclick="fazerLogout()" style="display:none;">Sair</button>
 </body>
 
 </html>
