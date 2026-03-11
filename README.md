@@ -63,3 +63,51 @@ https://analytics.google.com/analytics/web/?hl=pt-br#/a134714060p527405664/repor
 https://support.google.com/analytics/answer/9289234
 https://support.google.com/analytics/answer/9304153?hl=pt-BR&utm_id=ad#setup-datacollection
 https://cloud.google.com/bigquery/pricing?hl=pt-BR&authuser=0
+
+
+
+
+gcloud auth print-identity-token --audiences=https://geminidataanalytics.googleapis.com
+
+
+gcloud auth print-identity-token --audiences=https://geminidataanalytics.googleapis.com
+
+
+curl  -H "Authorization: Bearer $(gcloud auth print-identity-token)" https://geminidataanalytics.googleapis.com/
+
+# 1. Obter o token e salvar na variável $token
+$token = gcloud auth print-identity-token
+
+# 2. Fazer a chamada usando Invoke-RestMethod (mais limpo que o Invoke-WebRequest)
+Invoke-RestMethod -Uri "https://geminidataanalytics.googleapis.com" -Method Get -Headers @{ Authorization = "Bearer $token" }
+
+
+$location=us-central1
+$token = gcloud auth print-identity-token
+$token = gcloud auth print-access-token
+
+set-content env:project llm-studies
+ls Env:project
+set-content env:location us-central1
+ls Env:location
+set-content env:token (gcloud auth print-access-token)
+$Env:token
+
+
+set-content env:url https://geminidataanalytics.googleapis.com/v1/projects/$Env:project/locations/$Env:location/operations
+ls Env:url
+
+Invoke-RestMethod -Uri $Env:url -Method Get -Headers @{ Authorization = "Bearer $Env:token" }
+
+gcloud services enable geminidataanalytics.googleapis.com --project llm-studies
+gcloud auth application-default login
+
+
+
+jupyter notebook
+
+
+chrome pessoal lquissakn
+
+https://crimson-comet-700387.postman.co/workspace/f7909bd4-527f-4cea-ad8c-53f2e602d80f/request/4066046-29586f49-0231-4a45-8442-e30c7bdca8ba?tab=auth
+

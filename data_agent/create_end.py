@@ -9,19 +9,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_google_auth_token():
-    """Obtém o token de acesso de forma nativa (sem gcloud CLI)."""
-    try:
-        # Busca credenciais padrão do ambiente (ADC)
-        credentials, project = google.auth.default(
-            scopes=['https://www.googleapis.com/auth/cloud-platform']
-        )
-        auth_request = google.auth.transport.requests.Request()
-        credentials.refresh(auth_request)
-        return credentials.token
-    except Exception as e:
-        print(f"❌ Erro de Autenticação: {e}")
-        print("Dica: Execute 'gcloud auth application-default login' no terminal.")
-        return None
+    credentials, project = google.auth.default(
+        scopes=['https://www.googleapis.com/auth/cloud-platform']
+    )
+    auth_request = google.auth.transport.requests.Request()
+    credentials.refresh(auth_request)
+    return credentials.token
 
 def create_data_agent():
     # Recuperando variáveis de ambiente
@@ -30,15 +23,16 @@ def create_data_agent():
     agent_id = os.getenv("DATA_AGENT_ID")
     bq_table_uri = os.getenv("BQ_TABLE_URI")
 
-    if not all([project_id, location, agent_id, bq_table_uri]):
-        print("❌ Erro: Verifique as variáveis no seu arquivo .env")
-        return
+    print(project_id, location, agent_id, bq_table_uri)
 
     token = get_google_auth_token()
     if not token: return
 
     url = f"https://conversationalanalytics.googleapis.com/v1alpha1/projects/{project_id}/locations/{location}/dataAgents:createSync"
     
+    # Tente a v1 ou v1beta se a v1alpha1 falhar com 404
+    url = f"https://conversationalanalytics.googleapis.com/v1/projects/{project_id}/locations/{location}/dataAgents:createSync"
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json; charset=utf-8"
@@ -55,12 +49,7 @@ def create_data_agent():
 
     print(f"🚀 Enviando requisição para {location}...")
     response = requests.post(url, headers=headers, json=payload)
-
-    if response.status_code == 200:
-        print("✅ Agente criado com sucesso!")
-        print(json.dumps(response.json(), indent=2))
-    else:
-        print(f"❌ Erro {response.status_code}: {response.text}")
+    print(response.text)
 
 if __name__ == "__main__":
     create_data_agent()
