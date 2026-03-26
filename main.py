@@ -1,83 +1,82 @@
 import os
+import requests
+import google.auth
+from google.auth.transport.requests import Request
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from google.cloud import discoveryengine_v1beta as discoveryengine
 
-# serving_config = f"projects/{project}/locations/{location}/collections/default_collection/dataStores/{data_store}/servingConfigs/default_serving_config"
-project = os.getenv("GCP_PROJECT_ID")
-print(f"Project ID: {project}")
-GCP_LOCATION = os.getenv("LOCATION", "us-central1")
-location = os.getenv("LOCATION", "us-central1")
-print(f"Location: {location}")
+app = FastAPI()
 
-agent = os.getenv("AGENT_ID")
-print(f"Agent ID: {agent}")
-
-data_store = os.getenv("DATA_STORE_ID")
-print(f"Data Store ID: {data_store}")
-
-app = FastAPI(title="Vertex Agent Bridge")
-
-# Configuração de CORS
 app.add_middleware(
     CORSMiddleware,
-    # Onde o seu Firebase está rodando
-    allow_origins=["http://localhost:5000"],
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Permite POST, GET, etc.
-    allow_headers=["*"],  # Permite X-Firebase-AppCheck, Content-Type, etc.
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Modelo de dados para a requisição
-
+# Configurações extraídas do notebook
+PROJECT_ID = "llm-studies"
+LOCATION = "global"
+AGENT_ID = "events_data_agent"
+API_VERSION = "v1beta"
+BASE_URL = "https://geminidataanalytics.googleapis.com"
 
 class ChatRequest(BaseModel):
     query: str
-    session_id: str = "default_session"
-
+    session_id: str # Usado como conversation_id
 
 @app.post("/chat")
-async def chat_with_agent(request: ChatRequest):
+async def chat_with_bq_agent(request: ChatRequest):
     try:
-        # 1. Inicializa o cliente do Discovery Engine
-        client = discoveryengine.ConversationalSearchServiceClient()
+        # 1. Autenticação
+        creds, _ = google.auth.default()
+        creds.refresh(Request())
+        headers = {
+            "Authorization": f"Bearer {creds.token}",
+            "Content-Type": "application/json"
+        }
 
-        # 2. Configura o caminho do Agent Engine / Data Store
-        # No Vertex Agent Builder, o 'serving_config' padrão geralmente é 'default_serving_config'
-        serving_config = client.serving_config_path(
-            project=project,
-            location=location,
-            data_store=data_store,
-            serving_config="default_serving_config"
-        )
+        conv_id = request.session_id
+        
+        # 2. Criar ou validar a Conversa
+        # No Gemini Data Analytics, a conversa deve apontar para o dataAgent específico
+        conv_url = f"{BASE_URL}/{API_VERSION}/projects/{PROJECT_ID}/locations/{LOCATION}/conversations"
+        conv_payload = {
+            "agents": [
+                f"projects/{PROJECT_ID}/locations/{LOCATION}/dataAgents/{AGENT_ID}"
+            ],
+            "name": f"projects/{PROJECT_ID}/locations/{LOCATION}/conversations/{conv_id}"
+        }
+        
+        # Tenta criar a conversa; se já existir, o serviço geralmente valida ou ignora
+        requests.post(conv_url, headers=headers, json=conv_payload, params={"conversation_id": conv_id})
 
-        # 3. Prepara a consulta
-        query_input = discoveryengine.Query(text_input=request.query)
+        # 3. Enviar a Mensagem
+        msg_url = f"{BASE_URL}/{API_VERSION}/projects/{PROJECT_ID}/locations/{LOCATION}/conversations/{conv_id}/messages:create"
+        
+        msg_payload = {
+            "content": {"text": request.query}
+        }
 
-        # 4. Chama a API do Vertex
-        # Nota: 'answer_query' é ideal para agentes de busca/RAG
-        response = client.answer_query(
-            discoveryengine.AnswerQueryRequest(
-                serving_config=serving_config,
-                query=query_input,
-                session_id=request.session_id  # Mantém o histórico da conversa
-            )
-        )
+        response = requests.post(msg_url, headers=headers, json=msg_payload)
 
-        # 5. Retorna a resposta limpa
+        if response.status_code != 200:
+            raise Exception(f"Erro ao enviar mensagem: {response.text}")
+
+        data = response.json()
+
+        # 4. Retornar a resposta do Agente
+        # A estrutura de resposta no notebook indica que o conteúdo textual fica em 'answer' -> 'content'
         return {
-            "answer": response.answer.answer_text,
-            "session_id": response.session_id,
-            "citations": [source.title for source in response.answer.citations]
+            "answer": data.get("answer", {}).get("content", "Sem resposta textual."),
+            "session_id": conv_id
         }
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-
-        # Retorna o erro para o frontend
         raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
