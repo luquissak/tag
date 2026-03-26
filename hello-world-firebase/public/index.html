@@ -1,51 +1,54 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="pt-br">
 <head>
   <meta charset="utf-8">
-  <title>Firebase Hello World</title>
+  <title>Firebase + Vertex AI Agent</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; padding: 20px; line-height: 1.6; }
+    #chat-box { border: 1px solid #ddd; height: 350px; overflow-y: auto; padding: 15px; background: #fdfdfd; border-radius: 8px; margin: 10px 0; }
+    .msg { margin-bottom: 10px; padding: 8px; border-radius: 5px; }
+    .user-msg { background: #e3f2fd; text-align: right; }
+    .bot-msg { background: #f1f1f1; color: #1a73e8; }
+    .controls { display: flex; gap: 10px; }
+    input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 4px; }
+    button { cursor: pointer; padding: 10px 20px; border: none; border-radius: 4px; background: #1a73e8; color: white; transition: 0.3s; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .auth-section { margin-bottom: 20px; padding: 10px; background: #eee; border-radius: 5px; }
+  </style>
 
   <script type="module">
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-    // Adicionamos as funções do Firestore aqui:
     import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
-
+    import { initializeAppCheck, ReCaptchaV3Provider, getToken } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app-check.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyAI4puz26cccTqcTQAn-0Uaoy64b0usofE",
-      authDomain: "llm-studies.firebaseapp.com",
-      projectId: "llm-studies",
-      storageBucket: "llm-studies.firebasestorage.app",
-      messagingSenderId: "129125337363",
-      appId: "1:129125337363:web:d63026258767dba7d272e6"
+      apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+      authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.REACT_APP_FIREBASE_APP_ID
     };
 
-    // Inicializar Firebase e Firestore
+    // 1. Inicialização
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
     const db = getFirestore(app);
-
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // Função de Login
-    window.fazerLogin = () => {
-      signInWithPopup(auth, provider)
-        .then((result) => {
-          console.log("Usuário logado:", result.user.displayName);
-        }).catch((error) => {
-          console.error("Erro no login:", error);
-        });
-    };
+    // 2. Configuração do App Check (Substitua a chave abaixo)
+    const appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider('6Lek4pgsAAAAACBxA4_1lc_SFFeLSOvYl4AG2E-B'),
+      isTokenAutoRefreshEnabled: true
+    });
 
-    // Função de Logout
-    window.fazerLogout = () => {
-      signOut(auth);
-    };
+    let usuarioLogadoUid = "sessao_anonima";
 
-    // Observador de estado (monitora se o usuário está logado ou não)
+    // 3. Monitor de Autenticação
     onAuthStateChanged(auth, (user) => {
       const status = document.getElementById('status');
       const btnLogin = document.getElementById('btnLogin');
@@ -53,49 +56,99 @@
 
       if (user) {
         status.innerHTML = `Olá, <b>${user.displayName}</b>!`;
+        usuarioLogadoUid = user.uid;
         btnLogin.style.display = 'none';
-        btnLogout.style.display = 'block';
+        btnLogout.style.display = 'inline-block';
       } else {
         status.innerHTML = "Você não está logado.";
-        btnLogin.style.display = 'block';
+        usuarioLogadoUid = "sessao_anonima";
+        btnLogin.style.display = 'inline-block';
         btnLogout.style.display = 'none';
       }
     });
 
-    // Função para salvar no banco
-    window.salvarNoFirestore = async () => {
+    // 4. Funções Globais (Expostas para o HTML)
+    window.fazerLogin = () => signInWithPopup(auth, provider);
+    window.fazerLogout = () => signOut(auth);
+
+    window.perguntarAoAgente = async () => {
+      const input = document.getElementById('pergunta');
+      const btn = document.getElementById('btnPerguntar');
+      const msgDiv = document.getElementById('mensagens');
+      const texto = input.value.trim();
+
+      if (!texto || btn.disabled) return;
+
+      // TRAVA DE CLIQUES: Desabilita UI
+      btn.disabled = true;
+      btn.innerText = "Processando...";
+      msgDiv.innerHTML += `<div class="msg user-msg"><b>Você:</b> ${texto}</div>`;
+      input.value = "";
+
       try {
-        const docRef = await addDoc(collection(db, "mensagens"), {
-          texto: "Hello do Firestore!",
-          autor: "Usuario Anonimo",
-          data: serverTimestamp()
+        // SEGURANÇA: Obtém o token do App Check para enviar ao seu FastAPI
+        const appCheckTokenResponse = await getToken(appCheck, false);
+        
+        const response = await fetch('http://localhost:8000/chat', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Firebase-AppCheck': appCheckTokenResponse.token // Opcional: seu backend pode validar isso
+          },
+          body: JSON.stringify({
+            query: texto,
+            session_id: usuarioLogadoUid
+          })
         });
 
-        alert("Documento salvo com ID: " + docRef.id);
-        console.log("Documento escrito com ID: ", docRef.id);
-      } catch (e) {
-        console.error("Erro ao adicionar documento: ", e);
-        alert("Erro ao salvar! Verifique o console.");
+        const data = await response.json();
+        msgDiv.innerHTML += `<div class="msg bot-msg"><b>Agente:</b> ${data.answer}</div>`;
+
+        // Log no Firestore
+        if (auth.currentUser) {
+          await addDoc(collection(db, "historico_chat"), {
+            uid: usuarioLogadoUid,
+            pergunta: texto,
+            resposta: data.answer,
+            timestamp: serverTimestamp()
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        msgDiv.innerHTML += `<div class="msg" style="color:red">Erro na comunicação.</div>`;
+      } finally {
+        // LIBERA CLIQUES: Reabilita UI
+        btn.disabled = false;
+        btn.innerText = "Perguntar";
+        msgDiv.scrollTop = msgDiv.scrollHeight;
       }
     };
-
-    // Função para disparar o evento
-    window.dispararEvento = () => {
-      logEvent(analytics, 'botao_clicado', {
-        item_nome: 'Botão de Teste',
-        horario: new Date().toISOString()
-      });
-      alert("Evento enviado ao Firebase!");
-      console.log("Evento 'botao_clicado' enviado!");
-    };</script>
+  </script>
 </head>
 
 <body>
-  <h1>Firebase - Big Query Data Agent</h1><br>
-  <button onclick="salvarNoFirestore()" style="font-size: 40px; padding: 10px 20px;">Salvar "Hello" no Banco</button><br>
-  <button onclick="dispararEvento()" style="font-size: 40px; padding: 10px 20px;">Clique aqui para disparar evento</button><br>
-  <button id="btnLogin" onclick="fazerLogin()" style="font-size: 20px; padding: 10px 20px;">Entrar com Google</button><br>
-  <button id="btnLogout" onclick="fazerLogout()" style="display:none;">Sair</button>
-</body>
+  <h1>Big Query Data Agent</h1>
 
+  <div class="auth-section">
+    <span id="status">Verificando...</span>
+    <button id="btnLogin" onclick="fazerLogin()">Entrar com Google</button>
+    <button id="btnLogout" onclick="fazerLogout()" style="display:none;">Sair</button>
+  </div>
+
+  <div id="chat-box">
+    <div id="mensagens"></div>
+  </div>
+
+  <div class="controls">
+    <input type="text" id="pergunta" placeholder="Digite sua dúvida sobre os dados...">
+    <button id="btnPerguntar" onclick="perguntarAoAgente()">Perguntar</button>
+  </div>
+
+  <script>
+    // Atalho para o Enter
+    document.getElementById('pergunta')?.addEventListener('keypress', (e) => {
+      if(e.key === 'Enter') perguntarAoAgente();
+    });
+  </script>
+</body>
 </html>
